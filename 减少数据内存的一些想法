@@ -1,4 +1,8 @@
+#减少dataframe中数据存储占用的内存，加快运行速度。
 #思路在于将数据的存储方式改变，主要针对int和float，object型数据可以通过labelencoder方式转成int，再处理。
+#将int64改成int8,int16,int32,uint8,uint16,uint32
+#将float64改成float32
+
 import pandas as pd
 import numpy as np
 
