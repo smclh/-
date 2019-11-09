@@ -1,0 +1,49 @@
+＃这里是一些数据可视化的思路
+＃这里主要将训练和测试一起分析，需要'is'_train'来区分，建议使用如下语句：
+df = pd.concat（[train.assign（is_train = 1），test.assign（is_train = 0）]）
+＃直观化主要涉及数据缺失率，训练与测试的分布，和不同目标下数据的分布，根据数据为离散型还是连续性和target是分类还是回归分开讨论。
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+plt.style.use('ggplot')
+import warnings
+warnings.filterwarnings("ignore")
+
+def get_feature_null(data,feature):
+    print('train中'+feature+'的缺失率:',data.loc[data.is_train==1,feature].isnull().mean())
+    print('test中'+feature+'的缺失率:',data.loc[data.is_train==0,feature].isnull().mean())
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
