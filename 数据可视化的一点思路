@@ -11,18 +11,161 @@ plt.style.use('ggplot')
 import warnings
 warnings.filterwarnings("ignore")
 
+#查看数据缺失情况
 def get_feature_null(data,feature):
     print('train中'+feature+'的缺失率:',data.loc[data.is_train==1,feature].isnull().mean())
     print('test中'+feature+'的缺失率:',data.loc[data.is_train==0,feature].isnull().mean())
 
+#对于feature是离散型的情况
 
+#了解数据出现的类型数，及test中新出现的类及其占比，train中多余的类及其占比
+def get_feature_nunique(data,feature):
+    train_nun = data.loc[data.is_train==1,feature].unique()
+    test_nun = data.loc[data.is_train==0,feature].unique()
+    print('train中'+feature+'的类别数:',len(train_nun))
+    print('test中'+feature+'的类别数:',len(test_nun))
+    print('test中'+feature+'新出现类别数:',len([i for i in test_nun if i not in train_nun])-1)
+    print('test新出现的类别占比:',data[(data[feature].isin([i for i in test_nun if i not in train_nun]))&(data[feature].notnull())].shape[0]/data[data.is_train==0].shape[0])
+    print('未在test中出现的类:',len([i for i in train_nun if i not in test_nun])-1)
+    print('未在test中出现的类占比:',data[(data[feature].isin([i for i in train_nun if i not in test_nun]))&(data[feature].notnull())].shape[0]/data[data.is_train==1].shape[0])
+    
+#查看数据分布的一致性，计算相同类的分布差异和
+def get_feature_count(data,feature):
+    temp = data.loc[data.is_train==1,feature].fillna('NA').value_counts('0').reset_index()
+    temp1 = data.loc[data.is_train==0,feature].fillna('NA').value_counts('0').reset_index()
+    temp = temp.merge(temp1,on='index',how='outer').fillna(0)
+    temp.columns = [feature,'density_train','density_test']    
+    return temp
 
+def get_feature_densitysame(data,feature,temp):
+    print('train与test的分布一致性：',1-abs(temp.density_train-temp.density_test).sum())
 
+#画出train中排名前十的类的barplot，test的相同barplot
+def get_feature_density_plot(data,feature,temp):
+    density_max = (temp.iloc[:,1:]*1.1).round(2).max().max()
+    f, ax1 = plt.subplots(figsize=(9, 5))
+    ax1 = sns.barplot(x=feature,y='density_train',data=temp.loc[:10],alpha=0.5,order = temp.loc[:10,feature])
+    ax1.set_ylim([0,density_max])
+    ax2 = ax1.twinx()
+    ax2 = sns.barplot(x=feature,y='density_test',data=temp.loc[:10],order = temp.loc[:10,feature])
+    ax2.set_ylim([0,density_max])
+    for x,y in enumerate(temp.loc[:10,'density_train']):                                                           
+        plt.text(x,y,str(y)[:5],ha='center',size=9,color='red') 
+    plt.text(9,density_max*0.8,'train',ha='center',size=13,color='red')
+    plt.text(9,density_max*0.7,'test',ha='center',size=13,color='blue')
+    plt.show()
 
+#若task为分类任务，输出不同类的类别均值
+def get_feature_target_dd(data,feature,target):
+    temp1 = data.groupby([feature])[target].agg(mean='mean',count='count').reset_index().fillna(0)
+    temp1.sort_values('count',ascending=False,inplace=True)
+    temp1.index = range(temp1.shape[0])
+    f, ax1 = plt.subplots(figsize=(9, 5))
+    ax1 = sns.barplot(x=feature,y='count',data=temp1.loc[:20],alpha=0.5,order=temp1.loc[:20,feature])
+    plt.xticks(rotation=60)
+    ax2 = ax1.twinx()
+    ax2.plot(temp1.loc[:20,'mean'])
+    ax2.plot([data[target].mean()]*20)
+    plt.show()
+#若task为回归任务，输出箱图
+def get_feature_target_dc(data,feature,target):
+    temp = data[feature].value_counts()[:10].index
+    f, ax = plt.subplots(figsize=(9, 5))
+    ax = sns.boxenplot(x=feature, y=target, data=data.loc[(data.is_train==1)&(data[feature].isin(temp))])
+    plt.show()
 
+#当feature为连续性时
 
+#输出数据范围，超出范围的占比
+def get_feature_Ranges(data,feature):
+    train_min = data.loc[data.is_train==1,feature].min()
+    train_max = data.loc[data.is_train==1,feature].max()
+    test_max = data.loc[data.is_train==0,feature].max()
+    test_min = data.loc[data.is_train==0,feature].min()
+    print('train中'+feature+'的取值范围:',train_min,'-',train_max)
+    print('test中'+feature+'的取值范围:',test_min,'-',test_max)
+    print('test中超出train范围的数据占比:',data.loc[(data[feature]>train_max)|(data[feature]<train_min)].shape[0]/data[data.is_train==0].shape[0])
+    print('train中超出test范围的数据占比:',data.loc[(data[feature]>test_max)|(data[feature]<test_min)].shape[0]/data[data.is_train==1].shape[0])
 
+#输出train和test的密度分布
+def get_feature_density_plot_c(data,feature):
+    f, ax = plt.subplots(figsize=(9, 5))
+    ax = sns.distplot(data.loc[data.is_train==1,feature],label='train')
+    ax = sns.distplot(data.loc[data.is_train==0,feature],label='test')
+    plt.legend()
+    plt.show()
 
+#当task为分类任务时，输出不同target的分布
+def get_feature_target_cd(data,feature,target):
+    f, ax = plt.subplots(figsize=(9, 5))
+    ax = sns.distplot(data.loc[(data.is_train==1)&(data[target]==1),feature],label='1')
+    ax = sns.distplot(data.loc[(data.is_train==1)&(data[target]==0),feature],label='0')
+    plt.legend()
+    plt.show()
+
+#当task为回归任务时，输出散点图
+def get_feature_target_cc(data,feature,target):
+    sns.jointplot(feature,target, data=data.loc[data.is_train==1,[feature,target]], kind="hex")
+    plt.show()
+
+#对于连续型变量，将其离散化，后处理步骤于离散型一致
+def get_feature_cut_c(data,feature):
+    prev_cut = data.loc[data.is_train==1,feature].min() - 1
+    cuts = [prev_cut]
+    for i in range(1,31):
+        next_cut = np.percentile(data.loc[data.is_train==1,feature], i * 100 / 30)
+        if next_cut > prev_cut+0.000001:
+            cuts.append(next_cut)
+        prev_cut = next_cut
+    data[feature+'_cut'] = pd.cut(data[feature],cuts,retbins=True)[0]
+    data[feature+'_cut'] = data[feature+'_cut'].cat.add_categories('NA')
+    data.loc[data[feature].isnull(),feature+'_cut'] = 'NA'
+    data[feature+'_cut'] = data[feature+'_cut'].cat.add_categories('NEW')
+    data.loc[data[feature+'_cut'].isnull(),feature+'_cut'] = 'NEW'
+    return data
+
+def get_feature_cut_density_plot_c(data,feature,temp):
+    f, ax1 = plt.subplots(figsize=(9, 5))
+    density_max = (temp.iloc[:,1:]*1.1).round(2).max().max()
+    ax1 = sns.barplot(x=feature+'_cut',y='density_train',data=temp,alpha=0.5)
+    ax1.set_ylim([0,density_max])
+    plt.xticks(rotation=60)
+    ax2 = ax1.twinx()
+    ax2 = sns.barplot(x=feature+'_cut',y='density_test',data=temp)
+    ax2.set_ylim([0,density_max])
+    for x,y in enumerate(temp['density_train']):                                                           
+        plt.text(x,y,str(y)[:5],ha='center',size=9,color='red') 
+    plt.text(temp.shape[0]-1,density_max*0.8,'train',ha='center',size=13,color='red')
+    plt.text(temp.shape[0]-1,density_max*0.7,'test',ha='center',size=13,color='blue')
+    plt.show()
+    
+def get_feature_cut_density_plotandsame_c(data,feature):
+    temp = data.loc[data.is_train==1,feature+'_cut'].value_counts('0').reset_index()
+    temp1 = data.loc[data.is_train==0,feature+'_cut'].value_counts('0').reset_index()
+    temp = temp.merge(temp1,on='index',how='outer')
+    temp.columns = [feature+'_cut','density_train','density_test']
+    temp.sort_values(by=feature+'_cut',ascending=True,inplace=True)
+    temp[feature+'_cut'] = temp[feature+'_cut'].astype('str')
+    temp.index = range(temp.shape[0])
+    print(feature+'_cut的train与test的分布一致性：',temp.density_train.corr(temp.density_test))
+    get_feature_cut_density_plot_c(data,feature,temp)
+
+def get_feature_cut_target_cd(data,feature,target):
+    temp1 = data.groupby([feature+'_cut'])[target].agg(mean='mean',count='count').reset_index()
+    temp1[['mean','count']] = temp1[['mean','count']].fillna(0)
+    f, ax1 = plt.subplots(figsize=(9, 5))
+    ax1 = sns.barplot(x=feature+'_cut',y='count',data=temp1,alpha=0.5)
+    plt.xticks(rotation=60)
+    ax2 = ax1.twinx()
+    ax2.plot(temp1['mean'])
+    ax2.plot([data[target].mean()]*temp1.shape[0])
+    plt.show()
+
+def get_feature_cut_target_cc(data,feature,target):
+    f, ax = plt.subplots(figsize=(9, 5))
+    ax = sns.boxenplot(x=feature+'_cut', y=target, data=data.loc[data.is_train==1])
+    plt.xticks(rotation=60)
+    plt.show()
 
 
 
